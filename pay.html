@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>订单支付</title>
+  <!-- 引入Element UI的样式 -->
+  <link rel="stylesheet" href="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.9/index.css">
+  <!-- 补充Element UI图标字体引用 -->
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  
+  <style>
+    .pay-container {
+      min-height: 100vh;
+      background-color: #f5f7fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .pay-content {
+      width: 100%;
+      max-width: 480px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+    }
+    
+    .pay-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 32px;
+      gap: 12px;
+    }
+    
+    .pay-header i {
+      font-size: 28px;
+      color: #409eff;
+    }
+    
+    .pay-header h2 {
+      margin: 0;
+      font-size: 24px;
+      color: #303133;
+      font-weight: 600;
+    }
+    
+    .pay-info {
+      margin-bottom: 32px;
+    }
+    
+    .pay-card {
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    
+    .pay-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .pay-amount {
+      text-align: center;
+      padding: 24px 0;
+      border-bottom: 1px dashed #e4e7ed;
+      margin-bottom: 24px;
+    }
+    
+    .amount-label {
+      font-size: 14px;
+      color: #909399;
+      margin-bottom: 8px;
+    }
+    
+    .amount-value {
+      font-size: 32px;
+      font-weight: 600;
+      color: #409eff;
+    }
+    
+    .pay-details {
+      padding: 0 16px;
+    }
+    
+    .pay-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      font-size: 14px;
+    }
+    
+    .label {
+      width: 80px;
+      color: #909399;
+    }
+    
+    .value {
+      flex: 1;
+      color: #606266;
+    }
+    
+    .payment-type {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .payment-type i {
+      font-size: 16px;
+      color: #409eff;
+    }
+    
+    .qrcode-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .qrcode-container {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    
+    .qrcode-image {
+      width: 200px;
+      height: 200px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+    }
+    
+    .scan-tip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #909399;
+      font-size: 14px;
+    }
+    
+    .scan-tip i {
+      font-size: 16px;
+    }
+    
+    .countdown-container {
+      width: 100%;
+      max-width: 320px;
+    }
+    
+    .countdown-text {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      color: #909399;
+      font-size: 14px;
+    }
+    
+    .countdown-text .time {
+      color: #f56c6c;
+      font-weight: 500;
+    }
+    
+    .countdown-progress {
+      margin-top: 8px;
+    }
+    
+    .el-progress-bar__inner {
+      transition: all 0.3s linear;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="pay-container">
+      <div class="pay-content">
+        <div class="pay-header">
+          <i class="el-icon-wallet"></i>
+          <h2>订单支付</h2>
+        </div>
+        
+        <div class="pay-info">
+          <el-card shadow="hover" class="pay-card">
+            <div class="pay-amount">
+              <div class="amount-label">支付金额</div>
+              <div class="amount-value">¥{{ payInfo.money }}</div>
+            </div>
+            <div class="pay-details">
+              <div class="pay-item">
+                <span class="label">订单号</span>
+                <span class="value">{{ payInfo.out_trade_no }}</span>
+              </div>
+              <div class="pay-item">
+                <span class="label">支付方式</span>
+                <span class="value payment-type">
+                  <i :class="payInfo.type === 'wxpay' ? 'el-icon-chat-dot-square' : 'el-icon-money'"></i>
+                  {{ getPayTypeName() }}
+                </span>
+              </div>
+            </div>
+          </el-card>
+        </div>
+        
+        <div class="qrcode-section">
+          <div class="qrcode-container">
+            <img src="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.1/wxpay.png" alt="微信支付二维码" class="qrcode-image">
+            <div class="scan-tip">
+              <i class="el-icon-mobile"></i>
+              <span>请使用微信扫一扫</span>
+            </div>
+          </div>
+          
+          <div class="countdown-container" v-if="remainingTime">
+            <div class="countdown-text">
+              <span>支付倒计时</span>
+              <span class="time">{{ Math.floor(remainingTime / 60) }}:{{ (remainingTime % 60).toString().padStart(2, '0') }}</span>
+            </div>
+            <el-progress :percentage="(remainingTime / maxTime) * 100" :show-text="false" class="countdown-progress"></el-progress>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入Vue.js -->
+  <script src="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.7/vue.js"></script>
+  <!-- 引入Element UI -->
+  <script src="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.9/element-plus.js"></script>
+  <!-- 引入CryptoJS -->
+  <script src="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.8/crypto.js"></script>
+  <!-- 引入Axios -->
+  <script src="https://gitee.com/peng-zhengliang/mydoc/releases/download/v1.7/axios.js"></script>
+
+  <script>
+    // 模拟articleApi
+    const articleApi = {
+      async postProductOrderNo(amount, orderno) {
+        try {
+          const response = await axios.post(`https://plat.linpoem.online/api/blog/order/createproduct/${amount}/${orderno}`);
+          console.log('创建订单成功:', response.data);
+          return response.data;
+        } catch (error) {
+          console.error('创建订单失败:', error);
+          // 模拟返回数据，实际使用时应删除
+          return { payment_no: 'MOCK' + Date.now(), payment_id: 'MOCK_ID_' + Date.now() };
+        }
+      },
+      async postOrderNoPayCheck(id) {
+        try {
+          const response = await axios.post(`https://plat.linpoem.online/api/blog/order/paycheck2/${id}`);
+          return response.data;
+        } catch (error) {
+          console.error('检查支付状态失败:', error);
+          // 模拟返回数据，实际使用时应删除
+          return Math.random() > 0.7 ? "支付成功" : "等待支付";
+        }
+      }
+    };
+
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          payInfo: {
+            money: '',
+            name: '',
+            notify_url: '',
+            out_trade_no: '',
+            pid: '',
+            return_url: '',
+            sign: '',
+            sign_type: '',
+            type: '',
+            trade_no: '',
+          },
+          loading: false,
+          timer: null,
+          countdownTimer: null,
+          remainingTime: 0,
+          maxTime: 300, // 5分钟，单位是秒
+          checkPayInterval: null
+        }
+      },
+      created() {
+        this.parseUrlParams();
+        this.createOrder();
+      },
+      beforeDestroy() {
+        // 组件销毁前清除定时器
+        clearInterval(this.checkPayInterval);
+        if (this.countdownTimer) {
+          clearInterval(this.countdownTimer);
+        }
+      },
+      methods: {
+        parseUrlParams() {
+          // 获取URL中的查询参数
+          const urlParams = new URLSearchParams(window.location.search);
+          const query = {};
+          
+          for (const [key, value] of urlParams.entries()) {
+            query[key] = value;
+          }
+          
+          // 将查询参数赋值给payInfo对象
+          this.payInfo = {
+            money: query.money || '',
+            name: query.name || '',
+            notify_url: query.notify_url || '',
+            out_trade_no: query.out_trade_no || '',
+            pid: query.pid || '',
+            return_url: query.return_url || '',
+            sign: query.sign || '',
+            sign_type: query.sign_type || '',
+            type: query.type || ''
+          }
+        },
+        getPayTypeName() {
+          const typeMap = {
+            'wxpay': '微信支付',
+            'alipay': '支付宝支付'
+          }
+          return typeMap[this.payInfo.type] || '未知支付方式'
+        },
+        async createOrder() {
+          try {
+            //创建订单 获取订单号和状态
+            let order = await articleApi.postProductOrderNo(this.payInfo.money, this.payInfo.out_trade_no);
+            this.payInfo.trade_no = order.payment_no;
+            this.getmd5();
+            this.startCheckPay(order.payment_id);
+            this.startCountdown(); // 启动倒计时
+          } catch (error) {
+            console.error('创建订单失败:', error);
+          }
+        },
+        async CheckPay(payment_id) {
+          try {
+            // 尝试获取当前用户信息
+            const res = await articleApi.postOrderNoPayCheck(payment_id);
+            if (res === "支付成功") {
+              this.executeCallback();
+              clearInterval(this.checkPayInterval);
+              // 清除倒计时
+              if (this.countdownTimer) {
+                clearInterval(this.countdownTimer);
+                this.countdownTimer = null;
+              }
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        },
+        startCheckPay(payment_id) {
+          // 设置定时器，每 5 秒调用一次 CheckPay
+          const maxTime = 300 * 1000;  // 5 分钟，单位是毫秒
+          let elapsedTime = 0; // 已经过去的时间，单位是毫秒
+
+          // 每隔 5 秒执行一次 CheckPay
+          this.checkPayInterval = setInterval(async () => {
+            // 调用 CheckPay 方法检查支付状态
+            await this.CheckPay(payment_id);
+
+            // 累加已过去的时间
+            elapsedTime += 5000;
+
+            // 如果超过 5 分钟，停止定时器
+            if (elapsedTime >= maxTime) {
+              clearInterval(this.checkPayInterval);
+              // 清除倒计时
+              if (this.countdownTimer) {
+                clearInterval(this.countdownTimer);
+                this.countdownTimer = null;
+              }
+            }
+          }, 5000); // 5秒调用一次 CheckPay
+        },
+        // 启动倒计时
+        startCountdown() {
+          // 重置倒计时
+          this.remainingTime = this.maxTime;
+          
+          // 清除可能存在的旧定时器
+          if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+          }
+          
+          // 创建新的倒计时定时器
+          this.countdownTimer = setInterval(() => {
+            if (this.remainingTime > 0) {
+              this.remainingTime -= 1;
+            } else {
+              // 倒计时结束，清除定时器
+              clearInterval(this.countdownTimer);
+              this.countdownTimer = null;
+            }
+          }, 1000);
+        },
+        async executeCallback() {
+          // 构建回调URL，拼接必要的参数
+          if (!this.payInfo.return_url) {
+            console.error('缺少回调URL');
+            return;
+          }
+          // 构建回调参数
+          const callbackParams = new URLSearchParams();
+          callbackParams.append('pid', this.payInfo.pid);
+          callbackParams.append('trade_no', this.payInfo.trade_no); // 模拟易支付订单号
+          callbackParams.append('out_trade_no', this.payInfo.out_trade_no);
+          callbackParams.append('type', this.payInfo.type);
+          callbackParams.append('name', this.payInfo.name);
+          callbackParams.append('money', this.payInfo.money);
+          callbackParams.append('trade_status', 'TRADE_SUCCESS'); // 支付状态
+          callbackParams.append('sign', this.payInfo.sign); // 使用原始签名
+          callbackParams.append('sign_type', this.payInfo.sign_type);
+
+          // 构建完整的回调URL
+          let callbackUrl = this.payInfo.return_url;
+          if (callbackUrl.includes('?')) {
+            callbackUrl += '&' + callbackParams.toString();
+          } else {
+            callbackUrl += '?' + callbackParams.toString();
+          }
+          
+          // 等待通知请求完成后再跳转
+          await this.sendNotifyRequest(callbackParams);
+          window.location.href = callbackUrl;
+        },
+        getmd5() {
+          // 获取到参数后可自动进行新的签名计算
+          const screatkey = '12345678';
+
+          // 示例格式 money=0.1&name=XUCDFI1XFNDBWLTL&out_trade_no=XUCDFI1XFNDBWLTL&pid=21332&trade_no=202501748441541653&trade_status=TRADE_SUCCESS&type=alipay{screatkey}
+          const paramsString = `money=${this.payInfo.money}&name=${this.payInfo.name}&out_trade_no=${this.payInfo.out_trade_no}&pid=${this.payInfo.pid}&trade_no=${this.payInfo.trade_no}&trade_status=TRADE_SUCCESS&type=${this.payInfo.type}${screatkey}`;
+
+          // 使用 CryptoJS 生成 MD5 签名
+          this.payInfo.sign = CryptoJS.MD5(paramsString).toString();
+        },
+        sendNotifyRequest(params) {
+          return new Promise((resolve) => {
+            // 检查是否有通知URL
+            if (!this.payInfo.notify_url) {
+              console.error('缺少通知URL');
+              resolve(); // 即使没有notify_url也继续执行后续流程
+              return;
+            }
+
+            // 构建完整的通知URL
+            let notifyUrl = this.payInfo.notify_url;
+            if (notifyUrl.includes('?')) {
+              notifyUrl += '&' + params.toString();
+            } else {
+              notifyUrl += '?' + params.toString();
+            }
+
+            fetch(notifyUrl, { method: 'GET' });
+            let isResolved = false;
+            // 使用Promise.race和setTimeout实现更可靠的超时控制
+            const timeoutPromise = new Promise((timeoutResolve) => {
+              setTimeout(() => {
+                if (!isResolved) {
+                  isResolved = true;
+                  timeoutResolve();
+                  resolve();
+                }
+              }, 2000); // 设置2秒超时
+            });
+            
+            // 即使上面的逻辑都失败，也确保最终会继续流程
+            Promise.race([timeoutPromise]).catch(() => {
+              if (!isResolved) {
+                console.error('通知请求发生未预期的错误');
+                isResolved = true;
+                resolve();
+              }
+            });
+          });
+        }
+      }
+    });
+  </script>
+</body>
+</html>
